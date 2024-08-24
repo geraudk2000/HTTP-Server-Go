@@ -19,8 +19,10 @@ func handleConnection(conn net.Conn) {
 	}
 
 	var res string
+
 	path := request.URL.Path
 	fmt.Println(path)
+
 	if path == "/" {
 		res = "HTTP/1.1 200 OK\r\n\r\n"
 	} else if path == "/user-agent" {
@@ -43,11 +45,13 @@ func main() {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
 	}
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+		go handleConnection(conn)
 	}
-	handleConnection(conn)
 
 }
