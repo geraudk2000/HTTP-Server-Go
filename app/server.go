@@ -1,35 +1,37 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"log"
 	"net"
+	"net/http"
 	"os"
-	"strings"
 )
 
-func do(conn net.Conn) {
+func handleConnection(conn net.Conn) {
 
-	buff := make([]byte, 1024)
-	n, err := conn.Read(buff)
+	defer conn.Close()
+
+	request, err := http.ReadRequest(bufio.NewReader(conn))
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error reading request. ", err.Error())
+		return
 	}
 
-	//fmt.Println(string(buff))
-	request := string(buff[:n])
-	path := strings.Split(request, " ")[1]
+	var res string
+	path := request.URL.Path
 
 	if path == "/" {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	} else if strings.Split(path, "/")[1] == "echo" {
-		message := strings.Split(path, "/")[2]
-		conn.Write([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(message), message)))
+		res = "HTTP/1.1 200 OK\r\n\r\n"
+	} else if path == "/user-agent" {
+		res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(request.UserAgent()), request.UserAgent())
+	} else if path[0:6] == "/echo/" {
+		echo := path[6:]
+		res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echo), echo)
 	} else {
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		res = "HTTP/1.1 404 Not Found\r\n\r\n"
 	}
-	conn.Close()
-
+	conn.Write([]byte(res))
 }
 
 func main() {
@@ -46,6 +48,6 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
-	do(conn)
+	handleConnection(conn)
 
 }
