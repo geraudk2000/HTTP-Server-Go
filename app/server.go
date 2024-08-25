@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -23,7 +24,7 @@ func handleConnection(conn net.Conn) {
 	var res string
 
 	path := request.URL.Path
-	//fmt.Println(path)
+	//fmt.Printf(request.Method)
 
 	if path == "/" {
 		res = "HTTP/1.1 200 OK\r\n\r\n"
@@ -31,24 +32,48 @@ func handleConnection(conn net.Conn) {
 
 		file_name := strings.Split(path, "/")[2]
 		args := os.Args
-		fmt.Println(file_name)
+
 		if len(args) > 2 && args[1] == "--directory" {
 			dir := args[2]
 			file_path := filepath.Join(dir, file_name)
 
-			file, err := os.Open(file_path)
-			if err != nil {
-				res = "HTTP/1.1 404 Not Found\r\n\r\n"
-			} else {
+			if request.Method == "GET" {
+
+				file, err := os.Open(file_path)
+				if err != nil {
+					res = "HTTP/1.1 404 Not Found\r\n\r\n"
+				} else {
+					defer file.Close()
+
+					content, err := os.ReadFile(file_path)
+					if err != nil {
+						fmt.Printf("Failed to read file: %v\n", err)
+						return
+					}
+					fileContent := string(content)
+					res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(fileContent), fileContent)
+				}
+			} else if request.Method == "POST" {
+				file, err := os.OpenFile(file_path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					fmt.Printf("Faile to open file: %v\n", err)
+				}
 				defer file.Close()
 
-				content, err := os.ReadFile(file_path)
+				body, err := io.ReadAll(request.Body)
 				if err != nil {
-					fmt.Printf("Failed to read file: %v\n", err)
+					fmt.Println("Cannot read body:", err)
 					return
 				}
-				fileContent := string(content)
-				res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(fileContent), fileContent)
+				content := string(body)
+				//fmt.Println(string(body))
+				_, err = file.Write([]byte(content))
+				if err != nil {
+					fmt.Printf("Failed to write to file: %v\n", err)
+					return
+				}
+				res = "HTTP/1.1 201 Created\r\n\r\n"
+
 			}
 		} else {
 			fmt.Println("Usage: go run main.go --directory <directory_path>")
