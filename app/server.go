@@ -11,15 +11,6 @@ import (
 	"strings"
 )
 
-func containsEncryption(slice []string) bool {
-	for _, encryption := range slice {
-		if encryption == "gzip" {
-			return true
-		}
-	}
-	return false
-}
-
 func handleConnection(conn net.Conn) {
 
 	defer conn.Close()
@@ -92,13 +83,12 @@ func handleConnection(conn net.Conn) {
 		res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(request.UserAgent()), request.UserAgent())
 	} else if strings.HasPrefix(path, "/echo/") {
 		echo := strings.Split(path, "/")[2]
-		// request.Header["Accept-Encoding"]
-		if containsEncryption(request.Header["Accept-Encoding"]) {
-			res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echo), echo)
+
+		if request.Header.Get("Accept-Encoding") != "" && strings.Contains(request.Header["Accept-Encoding"][0], "gzip") {
+			res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s", len(echo), echo)
 		} else {
 			res = fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echo), echo)
 		}
-		//fmt.Println(request.Header["Accept-Encoding"])
 
 	} else {
 		res = "HTTP/1.1 404 Not Found\r\n\r\n"
